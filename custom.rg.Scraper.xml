@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="22">
+<Class name="custom.rg.Scraper">
+<Description><![CDATA[
+<p><b>Scrapes given URI and stores scraping fragment in database.</b></p>
+<p>Developed by Micky Hulse for <a href="http://www.registerguard.com">The Register-Guard</a>.</p>
+<p>Please visit <a href="https://github.com/mhulse/custom.rg.Scraper">GitHub</a> for more information and/or to get the latest version of this code.</p>]]></Description>
+<Super>%Persistent</Super>
+<TimeCreated>62151,42765.80179</TimeCreated>
+
+<Property name="name">
+<Description><![CDATA[
+<p><b>Name</b> of scraping "fragment".</p>]]></Description>
+<Type>%String</Type>
+<SqlColumnNumber>2</SqlColumnNumber>
+<Parameter name="MAXLEN" value="255"/>
+<Parameter name="TRUNCATE" value="1"/>
+</Property>
+
+<Property name="interval">
+<Description><![CDATA[
+<p><b>Interval</b> of scraping in minutes.</p>]]></Description>
+<Type>%Integer</Type>
+<InitialExpression>60</InitialExpression>
+<SqlColumnNumber>3</SqlColumnNumber>
+<Parameter name="MAXVAL" value="525600"/>
+<Parameter name="MINVAL" value="1"/>
+</Property>
+
+<Property name="first">
+<Description><![CDATA[
+<p><b>First</b> time scraped.</p>]]></Description>
+<Type>%TimeStamp</Type>
+<InitialExpression>$zdatetime($horolog, 3)</InitialExpression>
+<SqlColumnNumber>4</SqlColumnNumber>
+</Property>
+
+<Property name="scraped">
+<Description><![CDATA[
+<p><b>Date/time</b> of last scraping.</p>]]></Description>
+<Type>%TimeStamp</Type>
+<InitialExpression>$zdatetime($horolog, 3)</InitialExpression>
+<SqlColumnNumber>5</SqlColumnNumber>
+</Property>
+
+<Property name="scraping">
+<Description><![CDATA[
+<p><b>Contents</b> of scraping.</p>]]></Description>
+<Type>%Stream.GlobalCharacter</Type>
+<SqlColumnNumber>6</SqlColumnNumber>
+</Property>
+
+<Property name="uri">
+<Description><![CDATA[
+<p><b>URI</b> of scraping.</p>]]></Description>
+<Type>%String</Type>
+<SqlColumnNumber>7</SqlColumnNumber>
+<Parameter name="MAXLEN" value="255"/>
+<Parameter name="TRUNCATE" value="1"/>
+</Property>
+
+<Index name="IDKEY">
+<IdKey>1</IdKey>
+<Properties>name</Properties>
+</Index>
+
+<Method name="scrape">
+<Description><![CDATA[
+<p><b>Parameters:</b></p>
+<ul>
+<li><b>name:</b> <i>(Required)</i> Scraping fragment identifier.</li>
+<li><b>server:</b> <i>(Required)</i> The IP address or machine name of the web server that you wish to connect to.<b>*</b></li>
+<li><b>location:</b> Name of item to retrieve from the web server.<b>*</b></li>
+<li><b>interval:</b> Time, in minutes, of scraping interval. <b>Default:</b> 60 minutes.</li>
+<li><b>force:</b> Force scraping fragment update? <b>Default:</b> False (0).</li>
+<li><b>userAgent:</b> The User-Agent request-header field contains information about the user agent originating the request.<b>*</b></li>
+<li><b>followRedirect:</b> If true then automatically follow redirection requests from the web server. <b>Default:</b> False (0).<b>*</b></li>
+<li><b>https:</b> If not using a proxy server and this is true then it issues a request for an https page rather than the normal http page. <b>Default:</b> False (0).<b>*</b></li>
+<li><b>authorization:</b> Sets/get the 'Authorization:' header field in the Http request.<b>*</b></li>
+<li><b>contentEncoding:</b> Sets/gets the 'Content-Encoding:' entity header field in the HTTP request.<b>*</b></li>
+<li><b>contentType:</b> Sets/gets the 'Content-Type:' entity header field in the HTTP request. <b>Default:</b> "text/html".<b>*</b></li>
+<li><b>contentCharset:</b> If the ContentType starts with 'text/' then this is the charset to encode the contents with. <b>Default:</b> UTF-8.<b>*</b></li>
+<li><b>port:</b> The TCP/IP port number to connect to. <b>Default:</b> 80.<b>*</b></li>
+<li><b>pragma:</b> The Pragma general-header field is used to include implementation- specific directives that may apply to any recipient along the request/response chain.<b>*</b></li>
+</ul>
+<p><b>*</b> See <class>%Net.HttpRequest</class> for more info.</p>]]></Description>
+<ClassMethod>1</ClassMethod>
+<FormalSpec>name:%String="",server:%String="",location:%String="",interval:%Integer=60,force:%Boolean=0,userAgent:%String="",followRedirect:%Boolean=0,https:%Boolean=0,authorization:%String="",contentEncoding:%String="",contentType:%String="text/html",contentCharset:%String="UTF-8",port:%Integer=80,pragma:%String=""</FormalSpec>
+<ReturnType>%String</ReturnType>
+<Implementation><![CDATA[
+	; Return string:
+	set return = ""
+	
+	; Name/server required:
+	if ($length(name) && $length(server)) {
+		
+		; Return object:
+		set return = ##class(%Stream.GlobalCharacter).%New()
+		
+		; Open the Scraper object:
+		set scraper = ..%OpenId(name)
+		
+		; IF it's not an object OR an expired object OR force is true:
+		if ('$isobject(scraper) || ($isobject(scraper) && scraper.expired()) || force) {
+			
+			; %Net.HttpRequest stuff:
+			set http = ##class(%Net.HttpRequest).%New()
+			set http.Server = server
+			set:($length(location)) http.Location = location // Note the location does not contain a leading '/' character as this is implicit.
+			set:($length(userAgent)) http.UserAgent = userAgent
+			//set:($length(params)) http.Params = params // Appears to be useless: http://tinyurl.com/4gpyvx7
+			set:(followRedirect) http.FollowRedirect = followRedirect
+			set:(https) http.Https = https
+			set:($length(authorization)) http.Authorization = authorization
+			set:($length(contentEncoding)) http.ContentEncoding = contentEncoding
+			set http.ContentType = contentType
+			set http.ContentCharset = contentCharset
+			set http.Port = port
+			set:($length(pragma)) http.Pragma = pragma
+			//set:($Data()) http.XXXX = xxxxxxx
+			
+			; Get the request:
+			do http.Get()
+			
+			; Was the request was fulfilled?
+			if (http.HttpResponse.StatusCode = 200) {
+				
+				; Populate character stream:
+				do return.Write(##class(%CSP.Page).EscapeHTML(http.HttpResponse.Data.Read())) // Escape overkill?
+				
+				; Request URI:
+				set uri = $case(http.Https, 1:"https", :"http") _ "://" _ http.Server _ $case(http.Port, 80:"", :":" _ http.Port) _ $zstrip(location, "<", "/") // Should I EscapeURL too?
+				
+				; Updating an existing entry?
+				if ($isobject(scraper)) {
+					
+					; Yes:
+					set scraper.interval = interval
+					set scraper.scraped = $zdatetime($horolog, 3)
+					set scraper.uri = uri
+					set scraper.scraping = return
+					
+				} else {
+					
+					; No:
+					set scraper = ..%New()
+					set scraper.name = name
+					set scraper.interval = interval
+					set scraper.uri = uri
+					set scraper.scraping = return
+					
+				}
+				
+				; Save:
+				do scraper.%Save()
+				
+			} else {
+				
+				; Until I can think of something better:
+				do return.Write("<!-- Status code: " _ http.HttpResponse.StatusCode _ ", Reason: " _ http.HttpResponse.ReasonPhrase _ " -->")
+				; Maybe return last scraping stored in DB?
+				
+			}
+			
+		} else {
+			
+			; Return existing entry:
+			set return = scraper.scraping	
+			
+		}
+		
+		; Unescape the HTML:	
+		set return = ##class(%CSP.Page).UnescapeHTML(return.Read()) // More overkill?
+		
+	}
+	
+	; Return scraping:
+	quit return
+]]></Implementation>
+</Method>
+
+<Method name="expired">
+<Description><![CDATA[
+<p>
+Checks if scraping has expired.
+<br>
+Boolean return value.
+</p>]]></Description>
+<ReturnType>%Integer</ReturnType>
+<Implementation><![CDATA[
+	set return = 0
+	set:(##this.diff() >= ##this.interval) return = 1
+	quit return
+]]></Implementation>
+</Method>
+
+<Method name="diff">
+<Description><![CDATA[
+<p>Time difference since last scraping to now in minutes.</p>]]></Description>
+<ReturnType>%Integer</ReturnType>
+<Implementation><![CDATA[
+	; I am a little concerned about the speed here...
+	; Would using two $horolog values be faster?
+	quit $SYSTEM.SQL.DATEDIFF("mi", ##this.scraped, $horolog)
+]]></Implementation>
+</Method>
+
+<Method name="next">
+<Description><![CDATA[
+<p>Time until next scraping in minutes.</p>]]></Description>
+<ReturnType>%Integer</ReturnType>
+<Implementation><![CDATA[
+	set return = ##this.interval - ##this.diff()
+	set:(return <= 0) return = 0 // We don't want negative numbers.
+	quit return
+]]></Implementation>
+</Method>
+
+<Storage name="Default">
+<Type>%Library.CacheStorage</Type>
+<DataLocation>^custom.rg.ScraperD</DataLocation>
+<DefaultData>ScraperDefaultData</DefaultData>
+<IdLocation>^custom.rg.ScraperD</IdLocation>
+<IndexLocation>^custom.rg.ScraperI</IndexLocation>
+<StreamLocation>^custom.rg.ScraperS</StreamLocation>
+<Data name="ScraperDefaultData">
+<Value name="1">
+<Value>%%CLASSNAME</Value>
+</Value>
+<Value name="2">
+<Value>interval</Value>
+</Value>
+<Value name="3">
+<Value>first</Value>
+</Value>
+<Value name="4">
+<Value>scraped</Value>
+</Value>
+<Value name="5">
+<Value>scraping</Value>
+</Value>
+<Value name="6">
+<Value>uri</Value>
+</Value>
+</Data>
+</Storage>
+</Class>
+</Export>

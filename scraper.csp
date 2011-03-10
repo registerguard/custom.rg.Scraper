@@ -1,0 +1,76 @@
+﻿<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Micky's Scraping Object Class</title>
+<style type="text/css">
+	<!--
+		blockquote { background: #eee; border: 5px dotted #ddd; padding: 20px; }
+	-->
+</style>
+</head>
+
+<body>
+
+<script language="cache" runat="server">
+	
+	/*
+	set data = ##class(%Stream.GlobalCharacter).%New()
+	do data.Write("What's next?")
+	set scraper = ##class(custom.rg.Scraper).%New()
+	set scraper.scraping = data
+	do scraper.%Save()
+	set scraper = ""
+	*/
+	
+	/*
+	View table:
+	SELECT * FROM custom_rg.Scraper
+	Delete all rows:
+	DELETE FROM custom_rg.Scrpaer
+	*/
+	
+</script>
+
+#[ set scraper = ##class(custom.rg.Scraper).%OpenId("foo") ]#
+
+<csp:if condition="$isobject(scraper)">
+	<h2>Expired: #($case(scraper.expired(), 1:"True", :"False"))#; Next update in #(scraper.next())# minutes.</h2>
+</csp:if>
+
+<csp:comment> Args: "name", "server", "location", "interval" </csp:comment>
+
+<blockquote>#(##class(custom.rg.Scraper).scrape("foo", "www2.registerguard.com", "cms/index.php/static/global/sidebar/01/", 90))#</blockquote>
+
+<csp:comment>
+#(##class(custom.rg.Scraper).%DeleteId("foo"))#
+</csp:comment>
+
+<hr>
+
+#[ set scraper = ##class(custom.rg.Scraper).%OpenId("baz") ]#
+
+<csp:if condition="$isobject(scraper)">
+	<h2>Expired: #($case(scraper.expired(), 1:"True", :"False"))#; Next update in #(scraper.next())# minutes.</h2>
+</csp:if>
+
+<blockquote>#(##class(custom.rg.Scraper).scrape("baz", "www2.registerguard.com", "cms/index.php/outbox/moseley-most-recent-01/", 10))#</blockquote>
+
+<csp:comment>
+#(##class(custom.rg.Scraper).%DeleteId("baz"))#
+</csp:comment>
+
+<hr>
+
+<csp:comment>
+#[ set scraper = ##class(custom.rg.Scraper).%OpenId("yahoo") ]#
+
+<csp:if condition="$isobject(scraper)">
+	<h2>Expired: #($case(scraper.expired(), 1:"True", :"False"))#; Next update in #(scraper.next())# minutes.</h2>
+</csp:if>
+
+<blockquote>#(##class(custom.rg.Scraper).scrape("yahoo", "yahoo.com",, 500, 1, "Mozilla/5.0 (Windows; U; Windows NT 6.1; nl; rv:1.9.2.13) Gecko/20101203 Firefox/3.6.13"))#</blockquote>
+</csp:comment>
+
+</body>
+</html>
