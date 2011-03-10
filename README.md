@@ -2,11 +2,13 @@
 
 "Scraper" class for class for Intersystems Caché.
 
-See scraper.csp for examples.
+If you imporve upon this code and/or have feedback (positive/constructive/negative), please contact me here: <micky.hulse@registerguard.com>._
 
 ## Basic usage:
 
     #(##class(custom.rg.Scraper).scrape("baz", "www.foo.com", "cms/some/path/foo.php", 10))#
+
+See scraper.csp for more examples.
 
 ## custom_rg_Scraper properties:
 
