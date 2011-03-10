@@ -2,7 +2,9 @@
 
 "Scraper" class for class for Intersystems Caché.
 
-If you imporve upon this code and/or have feedback (positive/constructive/negative), please contact me here: <micky.hulse@registerguard.com>._
+If you imporve upon this code and/or have feedback, __please__ contact me:
+
+micky (.) hulse [at] registerguard (.) com.
 
 ## Basic usage:
 
