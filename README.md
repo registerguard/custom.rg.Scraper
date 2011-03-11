@@ -1,6 +1,6 @@
 ## About:
 
-"Scraper" class for class for Intersystems Caché.
+"Scraper" class for Intersystems Caché - World's fastest high performance object database.
 
 If you imporve upon this code and/or have feedback, __please__ contact me:
 
