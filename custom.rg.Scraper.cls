@@ -1,27 +1,41 @@
-﻿/// <p><b>Scrapes given URI and stores scraping fragment in database.</b></p>
+﻿Include dtCommon
+
+/// <p><b>Scrapes given URI and stores scraping fragment in database.</b></p>
+/// <p><b>Dependacies:</b> DTI's common (dtCommon.inc) macros.</p>
 /// <p>Developed by Micky Hulse for <a href="http://www.registerguard.com">The Register-Guard</a>.</p>
 /// <p>Please visit <a href="https://github.com/mhulse/custom.rg.Scraper">GitHub</a> for more information and/or to get the latest version of this code.</p>
+/// <p>Big ups to DTI's Eric Gauthier! Thanks for the <a href="https://groups.google.com/d/topic/dti-lightning/hagUO0vUq0c/discussion">pro help</a> Eric!</p>
+/// <p>TODO:</p>
+/// <ol>
+/// <li>Write accessor methods? For example: set interval after $normalize; return scraping with HTML unescaped; other?</li>
+/// <li>Use TRY/CATCH? Not sure of best way to handle this.</li>
+/// <li>What's faster/easier than $SYSTEM.SQL.DATEDIFF?</li>
+/// </ol>
 Class custom.rg.Scraper Extends %Persistent
 {
 
-/// <p><b>Name</b> of scraping "fragment".</p>
-Property name As %String(MAXLEN = 255, TRUNCATE = 1) [ SqlColumnNumber = 2 ];
+/// <p><b>Name</b> of scraping "fragment" (required).</p>
+Property name As %String(MAXLEN = 255) [ Required, SqlColumnNumber = 2 ];
 
-/// <p><b>Interval</b> of scraping in minutes.</p>
-Property interval As %Integer(MAXVAL = 525600, MINVAL = 1) [ InitialExpression = 60, SqlColumnNumber = 3 ];
+/// <p><b>Interval</b> of scraping in minutes (required).</p>
+Property interval As %Integer(MAXVAL = 525600, MINVAL = 1) [ Required, SqlColumnNumber = 3 ];
 
-/// <p><b>First</b> time scraped.</p>
-Property first As %TimeStamp [ InitialExpression = {$zdatetime($horolog, 3)}, SqlColumnNumber = 4 ];
+/// <p><b>First</b> time scraped (required).</p>
+Property first As %TimeStamp [ Required, SqlColumnNumber = 4 ];
 
-/// <p><b>Date/time</b> of last scraping.</p>
-Property scraped As %TimeStamp [ InitialExpression = {$zdatetime($horolog, 3)}, SqlColumnNumber = 5 ];
+/// <p><b>Date/time</b> of last scraping (required).</p>
+Property scraped As %TimeStamp [ Required, SqlColumnNumber = 5 ];
+
+/// <p><b>Counts</b> how many times scraping has been updated.</p>
+Property counter As %Integer [ Required, SqlColumnNumber = 6 ];
 
 /// <p><b>Contents</b> of scraping.</p>
-Property scraping As %Stream.GlobalCharacter [ SqlColumnNumber = 6 ];
+Property scraping As %Stream.GlobalCharacter [ SqlColumnNumber = 7 ];
 
-/// <p><b>URI</b> of scraping.</p>
-Property uri As %String(MAXLEN = 255, TRUNCATE = 1) [ SqlColumnNumber = 7 ];
+/// <p><b>URI</b> of scraping (required).</p>
+Property uri As %String(MAXLEN = 1024) [ Required, SqlColumnNumber = 8 ];
 
+/// <p><b>Note:</b> IdKey can't be updated; you need to delete and re-insert the row.</p>
 Index IDKEY On name [ IdKey ];
 
 /// <p><b>Parameters:</b></p>
@@ -58,21 +72,33 @@ ClassMethod scrape(
 	port As %Integer = 80,
 	pragma As %String = "") As %String
 {
-	; Return string:
-	set return = ""
+	; Initialize variables:
+	set return  = ""    // Return string.
+	set sc      = $$$OK // Status code.
+	set stream  = ""    // DT global character stream.
+	set scraper = ""    // Stream from database.
+	set http    = ""    // Net http request.
+	set uri     = ""    // URI of scraping.
+	
+	; Make sure interval is a whole number:
+	set interval = $normalize(interval, -1) // When scale=-1, num is truncated to an integer value.
 	
 	; Name/server required:
-	if ($length(name) && $length(server)) {
+	if ($length(name) && $length(server) && (interval > 0)) {
 		
-		; Return object:
-		set return = ##class(%Stream.GlobalCharacter).%New()
+		; Initialize global character stream object:
+		//set stream = ##class(%Stream.GlobalCharacter).%New()
+		set stream = ##class(dt.common.streams.GlobalCharacterStream).%New() // https://groups.google.com/d/topic/dti-lightning/hagUO0vUq0c/discussion
 		
 		; Open the Scraper object:
-		set scraper = ..%OpenId(name)
+		set scraper = ..%OpenId(name,, .sc)
 		
-		; IF it's not an object OR an expired object OR force is true:
-		if ('$isobject(scraper) || ($isobject(scraper) && scraper.expired()) || force) {
+		; IF there's a status error ($isobject(scraper) would also work) OR an expired object OR force is true:
+		if ($$$ISERR(sc) || ($isobject(scraper) && scraper.expired()) || force) {
 			
+			; Re-initialize:
+			set sc = $$$OK
+		
 			; %Net.HttpRequest stuff:
 			set http = ##class(%Net.HttpRequest).%New()
 			set http.Server = server
@@ -87,60 +113,74 @@ ClassMethod scrape(
 			set http.ContentCharset = contentCharset
 			set http.Port = port
 			set:($length(pragma)) http.Pragma = pragma
-			//set:($Data()) http.XXXX = xxxxxxx
-			
+			//set http.XXXX = xxxxxxx
+		
 			; Get the request:
-			do http.Get()
+			set sc = http.Get()
+		
+			; Was the request "fulfilled"?
+			if ($$$ISOK(sc) && (http.HttpResponse.StatusCode = 200)) {
 			
-			; Was the request was fulfilled?
-			if (http.HttpResponse.StatusCode = 200) {
-				
 				; Populate character stream:
-				do return.Write(##class(%CSP.Page).EscapeHTML(http.HttpResponse.Data.Read())) // Escape overkill?
-				
-				; Request URI:
+				do stream.Write(##class(%CSP.Page).EscapeHTML(http.HttpResponse.Data.Read()))
+			
+				; Build request URI:
 				set uri = $case(http.Https, 1:"https", :"http") _ "://" _ http.Server _ $case(http.Port, 80:"", :":" _ http.Port) _ $zstrip(location, "<", "/") // Should I EscapeURL too?
+				
+				; Validate interval:
+				set:(interval > 525600) interval = 525600 // (24 * 60) * 365 = 525600 minutes/year.
 				
 				; Updating an existing entry?
 				if ($isobject(scraper)) {
-					
+				
 					; Yes:
 					set scraper.interval = interval
 					set scraper.scraped = $zdatetime($horolog, 3)
+					set scraper.counter = scraper.counter + 1
+					//set scraper.scraping = stream
+					set sc = scraper.scraping.CopyFrom(stream)
 					set scraper.uri = uri
-					set scraper.scraping = return
-					
+				
 				} else {
-					
+				
 					; No:
 					set scraper = ..%New()
 					set scraper.name = name
 					set scraper.interval = interval
+					set (scraper.first, scraper.scraped) = $zdatetime($horolog, 3)
+					set scraper.counter = 1
+					//set scraper.scraping = stream
+					set sc = scraper.scraping.CopyFrom(stream)
 					set scraper.uri = uri
-					set scraper.scraping = return
-					
+				
 				}
 				
 				; Save:
-				do scraper.%Save()
+				set sc = scraper.%Save()
+				$$$dtThrow(sc, "Failed to save '" _ $get(name) _ "'.")
+				
+				; Return current scraping:
+				set stream = scraper.scraping
 				
 			} else {
 				
-				; Until I can think of something better:
-				do return.Write("<!-- Status code: " _ http.HttpResponse.StatusCode _ ", Reason: " _ http.HttpResponse.ReasonPhrase _ " -->")
-				; Maybe return last scraping stored in DB?
+				; Previous scraping:
+				set:($isobject(scraper)) stream = scraper.scraping _ $char(10) _ $char(10)
 				
+				; Append the status code and reason:
+				do stream.Write("<!-- Status code: " _ http.HttpResponse.StatusCode _ ", Reason: " _ http.HttpResponse.ReasonPhrase _ " -->")
+			
 			}
-			
+		
 		} else {
-			
-			; Return existing entry:
-			set return = scraper.scraping	
-			
+		
+			; Current scraping:
+			set stream = scraper.scraping	
+		
 		}
 		
 		; Unescape the HTML:	
-		set return = ##class(%CSP.Page).UnescapeHTML(return.Read()) // More overkill?
+		set return = ##class(%CSP.Page).UnescapeHTML(stream.Read())
 		
 	}
 	
@@ -153,19 +193,30 @@ ClassMethod scrape(
 /// <br>
 /// Boolean return value.
 /// </p>
-Method expired() As %Integer
+Method expired() As %Boolean
 {
 	set return = 0
 	set:(##this.diff() >= ##this.interval) return = 1
 	quit return
 }
 
-/// <p>Time difference since last scraping to now in minutes.</p>
-Method diff() As %Integer
+/// <p>Time difference since last scraping to now in minutes.
+/// <br>
+/// See <class>%SYSTEM.SQL</class>'s DATEDIFF ClassMethod for more info.
+/// </p>
+Method diff(datepart As %String = "mi") As %Integer
 {
-	; I am a little concerned about the speed here...
-	; Would using two $horolog values be faster?
-	quit $SYSTEM.SQL.DATEDIFF("mi", ##this.scraped, $horolog)
+	quit $SYSTEM.SQL.DATEDIFF(datepart, ##this.scraped, $horolog)
+}
+
+/// <p>
+/// Time since very first scraping.
+/// <br>
+/// See <class>%SYSTEM.SQL</class>'s DATEDIFF ClassMethod for more info.
+/// </p>
+Method age(datepart As %String = "mi") As %Integer
+{
+	quit $SYSTEM.SQL.DATEDIFF(datepart, ##this.first, $horolog)
 }
 
 /// <p>Time until next scraping in minutes.</p>
@@ -176,4 +227,8 @@ Method next() As %Integer
 	quit return
 }
 
+/// <p>Elapsed time, in minutes, since last update.</p>
+Method elapsed() As %Integer
+{
+	quit ##this.interval - ##this.next()
 }

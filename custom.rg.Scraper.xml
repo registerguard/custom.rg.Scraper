@@ -3,25 +3,34 @@
 <Class name="custom.rg.Scraper">
 <Description><![CDATA[
 <p><b>Scrapes given URI and stores scraping fragment in database.</b></p>
+<p><b>Dependacies:</b> DTI's common (dtCommon.inc) macros.</p>
 <p>Developed by Micky Hulse for <a href="http://www.registerguard.com">The Register-Guard</a>.</p>
-<p>Please visit <a href="https://github.com/mhulse/custom.rg.Scraper">GitHub</a> for more information and/or to get the latest version of this code.</p>]]></Description>
+<p>Please visit <a href="https://github.com/mhulse/custom.rg.Scraper">GitHub</a> for more information and/or to get the latest version of this code.</p>
+<p>Big ups to DTI's Eric Gauthier! Thanks for the <a href="https://groups.google.com/d/topic/dti-lightning/hagUO0vUq0c/discussion">pro help</a> Eric!</p>
+<p>TODO:</p>
+<ol>
+<li>Write accessor methods? For example: set interval after $normalize; return scraping with HTML unescaped; other?</li>
+<li>Use TRY/CATCH? Not sure of best way to handle this.</li>
+<li>What's faster/easier than $SYSTEM.SQL.DATEDIFF?</li>
+</ol>]]></Description>
+<IncludeCode>dtCommon</IncludeCode>
 <Super>%Persistent</Super>
 <TimeCreated>62151,42765.80179</TimeCreated>
 
 <Property name="name">
 <Description><![CDATA[
-<p><b>Name</b> of scraping "fragment".</p>]]></Description>
+<p><b>Name</b> of scraping "fragment" (required).</p>]]></Description>
 <Type>%String</Type>
+<Required>1</Required>
 <SqlColumnNumber>2</SqlColumnNumber>
 <Parameter name="MAXLEN" value="255"/>
-<Parameter name="TRUNCATE" value="1"/>
 </Property>
 
 <Property name="interval">
 <Description><![CDATA[
-<p><b>Interval</b> of scraping in minutes.</p>]]></Description>
+<p><b>Interval</b> of scraping in minutes (required).</p>]]></Description>
 <Type>%Integer</Type>
-<InitialExpression>60</InitialExpression>
+<Required>1</Required>
 <SqlColumnNumber>3</SqlColumnNumber>
 <Parameter name="MAXVAL" value="525600"/>
 <Parameter name="MINVAL" value="1"/>
@@ -29,37 +38,47 @@
 
 <Property name="first">
 <Description><![CDATA[
-<p><b>First</b> time scraped.</p>]]></Description>
+<p><b>First</b> time scraped (required).</p>]]></Description>
 <Type>%TimeStamp</Type>
-<InitialExpression>$zdatetime($horolog, 3)</InitialExpression>
+<Required>1</Required>
 <SqlColumnNumber>4</SqlColumnNumber>
 </Property>
 
 <Property name="scraped">
 <Description><![CDATA[
-<p><b>Date/time</b> of last scraping.</p>]]></Description>
+<p><b>Date/time</b> of last scraping (required).</p>]]></Description>
 <Type>%TimeStamp</Type>
-<InitialExpression>$zdatetime($horolog, 3)</InitialExpression>
+<Required>1</Required>
 <SqlColumnNumber>5</SqlColumnNumber>
+</Property>
+
+<Property name="counter">
+<Description><![CDATA[
+<p><b>Counts</b> how many times scraping has been updated.</p>]]></Description>
+<Type>%Integer</Type>
+<Required>1</Required>
+<SqlColumnNumber>6</SqlColumnNumber>
 </Property>
 
 <Property name="scraping">
 <Description><![CDATA[
 <p><b>Contents</b> of scraping.</p>]]></Description>
 <Type>%Stream.GlobalCharacter</Type>
-<SqlColumnNumber>6</SqlColumnNumber>
+<SqlColumnNumber>7</SqlColumnNumber>
 </Property>
 
 <Property name="uri">
 <Description><![CDATA[
-<p><b>URI</b> of scraping.</p>]]></Description>
+<p><b>URI</b> of scraping (required).</p>]]></Description>
 <Type>%String</Type>
-<SqlColumnNumber>7</SqlColumnNumber>
-<Parameter name="MAXLEN" value="255"/>
-<Parameter name="TRUNCATE" value="1"/>
+<Required>1</Required>
+<SqlColumnNumber>8</SqlColumnNumber>
+<Parameter name="MAXLEN" value="1024"/>
 </Property>
 
 <Index name="IDKEY">
+<Description><![CDATA[
+<p><b>Note:</b> IdKey can't be updated; you need to delete and re-insert the row.</p>]]></Description>
 <IdKey>1</IdKey>
 <Properties>name</Properties>
 </Index>
@@ -88,21 +107,33 @@
 <FormalSpec>name:%String="",server:%String="",location:%String="",interval:%Integer=60,force:%Boolean=0,userAgent:%String="",followRedirect:%Boolean=0,https:%Boolean=0,authorization:%String="",contentEncoding:%String="",contentType:%String="text/html",contentCharset:%String="UTF-8",port:%Integer=80,pragma:%String=""</FormalSpec>
 <ReturnType>%String</ReturnType>
 <Implementation><![CDATA[
-	; Return string:
-	set return = ""
+	; Initialize variables:
+	set return  = ""    // Return string.
+	set sc      = $$$OK // Status code.
+	set stream  = ""    // DT global character stream.
+	set scraper = ""    // Stream from database.
+	set http    = ""    // Net http request.
+	set uri     = ""    // URI of scraping.
+	
+	; Make sure interval is a whole number:
+	set interval = $normalize(interval, -1) // When scale=-1, num is truncated to an integer value.
 	
 	; Name/server required:
-	if ($length(name) && $length(server)) {
+	if ($length(name) && $length(server) && (interval > 0)) {
 		
-		; Return object:
-		set return = ##class(%Stream.GlobalCharacter).%New()
+		; Initialize global character stream object:
+		//set stream = ##class(%Stream.GlobalCharacter).%New()
+		set stream = ##class(dt.common.streams.GlobalCharacterStream).%New() // https://groups.google.com/d/topic/dti-lightning/hagUO0vUq0c/discussion
 		
 		; Open the Scraper object:
-		set scraper = ..%OpenId(name)
+		set scraper = ..%OpenId(name,, .sc)
 		
-		; IF it's not an object OR an expired object OR force is true:
-		if ('$isobject(scraper) || ($isobject(scraper) && scraper.expired()) || force) {
+		; IF there's a status error ($isobject(scraper) would also work) OR an expired object OR force is true:
+		if ($$$ISERR(sc) || ($isobject(scraper) && scraper.expired()) || force) {
 			
+			; Re-initialize:
+			set sc = $$$OK
+		
 			; %Net.HttpRequest stuff:
 			set http = ##class(%Net.HttpRequest).%New()
 			set http.Server = server
@@ -117,60 +148,74 @@
 			set http.ContentCharset = contentCharset
 			set http.Port = port
 			set:($length(pragma)) http.Pragma = pragma
-			//set:($Data()) http.XXXX = xxxxxxx
-			
+			//set http.XXXX = xxxxxxx
+		
 			; Get the request:
-			do http.Get()
+			set sc = http.Get()
+		
+			; Was the request "fulfilled"?
+			if ($$$ISOK(sc) && (http.HttpResponse.StatusCode = 200)) {
 			
-			; Was the request was fulfilled?
-			if (http.HttpResponse.StatusCode = 200) {
-				
 				; Populate character stream:
-				do return.Write(##class(%CSP.Page).EscapeHTML(http.HttpResponse.Data.Read())) // Escape overkill?
-				
-				; Request URI:
+				do stream.Write(##class(%CSP.Page).EscapeHTML(http.HttpResponse.Data.Read()))
+			
+				; Build request URI:
 				set uri = $case(http.Https, 1:"https", :"http") _ "://" _ http.Server _ $case(http.Port, 80:"", :":" _ http.Port) _ $zstrip(location, "<", "/") // Should I EscapeURL too?
+				
+				; Validate interval:
+				set:(interval > 525600) interval = 525600 // (24 * 60) * 365 = 525600 minutes/year.
 				
 				; Updating an existing entry?
 				if ($isobject(scraper)) {
-					
+				
 					; Yes:
 					set scraper.interval = interval
 					set scraper.scraped = $zdatetime($horolog, 3)
+					set scraper.counter = scraper.counter + 1
+					//set scraper.scraping = stream
+					set sc = scraper.scraping.CopyFrom(stream)
 					set scraper.uri = uri
-					set scraper.scraping = return
-					
+				
 				} else {
-					
+				
 					; No:
 					set scraper = ..%New()
 					set scraper.name = name
 					set scraper.interval = interval
+					set (scraper.first, scraper.scraped) = $zdatetime($horolog, 3)
+					set scraper.counter = 1
+					//set scraper.scraping = stream
+					set sc = scraper.scraping.CopyFrom(stream)
 					set scraper.uri = uri
-					set scraper.scraping = return
-					
+				
 				}
 				
 				; Save:
-				do scraper.%Save()
+				set sc = scraper.%Save()
+				$$$dtThrow(sc, "Failed to save '" _ $get(name) _ "'.")
+				
+				; Return current scraping:
+				set stream = scraper.scraping
 				
 			} else {
 				
-				; Until I can think of something better:
-				do return.Write("<!-- Status code: " _ http.HttpResponse.StatusCode _ ", Reason: " _ http.HttpResponse.ReasonPhrase _ " -->")
-				; Maybe return last scraping stored in DB?
+				; Previous scraping:
+				set:($isobject(scraper)) stream = scraper.scraping _ $char(10) _ $char(10)
 				
+				; Append the status code and reason:
+				do stream.Write("<!-- Status code: " _ http.HttpResponse.StatusCode _ ", Reason: " _ http.HttpResponse.ReasonPhrase _ " -->")
+			
 			}
-			
+		
 		} else {
-			
-			; Return existing entry:
-			set return = scraper.scraping	
-			
+		
+			; Current scraping:
+			set stream = scraper.scraping	
+		
 		}
 		
 		; Unescape the HTML:	
-		set return = ##class(%CSP.Page).UnescapeHTML(return.Read()) // More overkill?
+		set return = ##class(%CSP.Page).UnescapeHTML(stream.Read())
 		
 	}
 	
@@ -186,7 +231,7 @@ Checks if scraping has expired.
 <br>
 Boolean return value.
 </p>]]></Description>
-<ReturnType>%Integer</ReturnType>
+<ReturnType>%Boolean</ReturnType>
 <Implementation><![CDATA[
 	set return = 0
 	set:(##this.diff() >= ##this.interval) return = 1
@@ -196,12 +241,26 @@ Boolean return value.
 
 <Method name="diff">
 <Description><![CDATA[
-<p>Time difference since last scraping to now in minutes.</p>]]></Description>
+<p>Time difference since last scraping to now in minutes.
+<br>
+See <class>%SYSTEM.SQL</class>'s DATEDIFF ClassMethod for more info.
+</p>]]></Description>
+<FormalSpec>datepart:%String="mi"</FormalSpec>
 <ReturnType>%Integer</ReturnType>
-<Implementation><![CDATA[
-	; I am a little concerned about the speed here...
-	; Would using two $horolog values be faster?
-	quit $SYSTEM.SQL.DATEDIFF("mi", ##this.scraped, $horolog)
+<Implementation><![CDATA[	quit $SYSTEM.SQL.DATEDIFF(datepart, ##this.scraped, $horolog)
+]]></Implementation>
+</Method>
+
+<Method name="age">
+<Description><![CDATA[
+<p>
+Time since very first scraping.
+<br>
+See <class>%SYSTEM.SQL</class>'s DATEDIFF ClassMethod for more info.
+</p>]]></Description>
+<FormalSpec>datepart:%String="mi"</FormalSpec>
+<ReturnType>%Integer</ReturnType>
+<Implementation><![CDATA[	quit $SYSTEM.SQL.DATEDIFF(datepart, ##this.first, $horolog)
 ]]></Implementation>
 </Method>
 
@@ -213,6 +272,14 @@ Boolean return value.
 	set return = ##this.interval - ##this.diff()
 	set:(return <= 0) return = 0 // We don't want negative numbers.
 	quit return
+]]></Implementation>
+</Method>
+
+<Method name="elapsed">
+<Description><![CDATA[
+<p>Elapsed time, in minutes, since last update.</p>]]></Description>
+<ReturnType>%Integer</ReturnType>
+<Implementation><![CDATA[	quit ##this.interval - ##this.next()
 ]]></Implementation>
 </Method>
 
@@ -237,9 +304,12 @@ Boolean return value.
 <Value>scraped</Value>
 </Value>
 <Value name="5">
-<Value>scraping</Value>
+<Value>counter</Value>
 </Value>
 <Value name="6">
+<Value>scraping</Value>
+</Value>
+<Value name="7">
 <Value>uri</Value>
 </Value>
 </Data>

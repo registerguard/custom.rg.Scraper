@@ -1,6 +1,6 @@
 ## About:
 
-"Scraper" class for Intersystems Caché - World's fastest high performance object database.
+"Scraper" class for [Digital Technology International](http://dtint.com/)'s [ContentPublisher](http://dtint.com/Solutions/ContentPublisher) CMS which is built on Intersystems Caché, the world's fastest high performance object database.
 
 If you imporve upon this code and/or have feedback, __please__ contact me:
 
@@ -18,8 +18,17 @@ See scraper.csp for more examples.
 * __"interval"__ _Interval_ of scraping in minutes.
 * __"first"__ _First_ time scraped.
 * __"scraped"__ _Date/time_ of last scraping.
+* __"counter"__ _Counts_ how many times scraping has been updated.
 * __"scraping"__ _Contents_ of scraping.
 * __"uri"__ _URI_ of scraping.
+
+## custom_rg_Scraper methods:
+
+* __"expired"__ Checks if scraping has _expired_.
+* __"diff"__ _Time difference_ since last scraping to now in minutes.
+* __"age"__ Time since very _first_ scraping.
+* __"next"__ Time until _next_ scraping in minutes.
+* __"elapsed"__ _Elapsed_ time, in minutes, since last update.
 
 ## custom_rg_Scraper.scrape() parameters:
 
@@ -42,5 +51,17 @@ See scraper.csp for more examples.
 
 ## Changelog:
 
+* __2011/03/30__
+	* Properties no longer truncate.
+	* Properties that are logically required have been marked "Required".
+	* Added property "counter": Counts the number of times scraping has been updated.
+	* Added "age" method: Time since very first scraping.
+	* Added "elapsed" method: Elapsed time, in minutes, since last update.
+	* ClassMethod scrape() now depends on DTI's dtCommon.inc macros.
+		* Making use of $$$ISOK(), $$$ISERR() and $$$dtThrow() macros.
+		* Character stream now uses DT's global character stream class.
+		* Native Cache streams are not cached on ECP servers while streams defined in dt.common.streams.* are.
+		* Added/modified code, in a few spots, to check return "status".
+		* Initialized vars at top of ClassMethod (I like to see what I am working with).
 * __2011/03/10__
 	* Initial public release: Uploaded to GitHub.
