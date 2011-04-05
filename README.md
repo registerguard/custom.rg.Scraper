@@ -51,7 +51,14 @@ See scraper.csp for more examples.
 
 ## Changelog:
 
-* __2011/03/30__
+* v1.0.2: __2011/04/05__
+	* Modified URI formatting for storage in table.
+		* Needed to account for slash between server and location variables.
+	* Cleaned up indentation of tabbed white space.
+	* Slightly modified class documentation.
+		* Added version number.
+	* Added (more) error checking to return value from ClassMethod() scrape().
+* v1.0.1: __2011/03/30__
 	* Properties no longer truncate.
 	* Properties that are logically required have been marked "Required".
 	* Added property "counter": Counts the number of times scraping has been updated.
@@ -63,5 +70,5 @@ See scraper.csp for more examples.
 		* Native Cache streams are not cached on ECP servers while streams defined in dt.common.streams.* are.
 		* Added/modified code, in a few spots, to check return "status".
 		* Initialized vars at top of ClassMethod (I like to see what I am working with).
-* __2011/03/10__
+* v1.0.0: __2011/03/10__
 	* Initial public release: Uploaded to GitHub.

@@ -2,6 +2,7 @@
 <Export generator="Cache" version="22">
 <Class name="custom.rg.Scraper">
 <Description><![CDATA[
+<p>v1.0.2</p>
 <p><b>Scrapes given URI and stores scraping fragment in database.</b></p>
 <p><b>Dependacies:</b> DTI's common (dtCommon.inc) macros.</p>
 <p>Developed by Micky Hulse for <a href="http://www.registerguard.com">The Register-Guard</a>.</p>
@@ -9,7 +10,7 @@
 <p>Big ups to DTI's Eric Gauthier! Thanks for the <a href="https://groups.google.com/d/topic/dti-lightning/hagUO0vUq0c/discussion">pro help</a> Eric!</p>
 <p>TODO:</p>
 <ol>
-<li>Write accessor methods? For example: set interval after $normalize; return scraping with HTML unescaped; other?</li>
+<li>ClassMethod "scrape": Validate "server" parmeter? Would probably need to account for IP addys.</li>
 <li>Use TRY/CATCH? Not sure of best way to handle this.</li>
 <li>What's faster/easier than $SYSTEM.SQL.DATEDIFF?</li>
 </ol>]]></Description>
@@ -133,7 +134,7 @@
 			
 			; Re-initialize:
 			set sc = $$$OK
-		
+			
 			; %Net.HttpRequest stuff:
 			set http = ##class(%Net.HttpRequest).%New()
 			set http.Server = server
@@ -149,25 +150,25 @@
 			set http.Port = port
 			set:($length(pragma)) http.Pragma = pragma
 			//set http.XXXX = xxxxxxx
-		
+			
 			; Get the request:
 			set sc = http.Get()
-		
+			
 			; Was the request "fulfilled"?
 			if ($$$ISOK(sc) && (http.HttpResponse.StatusCode = 200)) {
-			
+				
 				; Populate character stream:
 				do stream.Write(##class(%CSP.Page).EscapeHTML(http.HttpResponse.Data.Read()))
-			
+				
 				; Build request URI:
-				set uri = $case(http.Https, 1:"https", :"http") _ "://" _ http.Server _ $case(http.Port, 80:"", :":" _ http.Port) _ $zstrip(location, "<", "/") // Should I EscapeURL too?
+				set uri = $case(http.Https, 1:"https", :"http") _ "://" _ http.Server _ $case(http.Port, 80:"", :":" _ http.Port) _ "/" _ $zstrip(location, "<", "/") // Should I EscapeURL too?
 				
 				; Validate interval:
 				set:(interval > 525600) interval = 525600 // (24 * 60) * 365 = 525600 minutes/year.
 				
 				; Updating an existing entry?
 				if ($isobject(scraper)) {
-				
+					
 					; Yes:
 					set scraper.interval = interval
 					set scraper.scraped = $zdatetime($horolog, 3)
@@ -175,9 +176,9 @@
 					//set scraper.scraping = stream
 					set sc = scraper.scraping.CopyFrom(stream)
 					set scraper.uri = uri
-				
+					
 				} else {
-				
+					
 					; No:
 					set scraper = ..%New()
 					set scraper.name = name
@@ -187,7 +188,7 @@
 					//set scraper.scraping = stream
 					set sc = scraper.scraping.CopyFrom(stream)
 					set scraper.uri = uri
-				
+					
 				}
 				
 				; Save:
@@ -204,18 +205,18 @@
 				
 				; Append the status code and reason:
 				do stream.Write("<!-- Status code: " _ http.HttpResponse.StatusCode _ ", Reason: " _ http.HttpResponse.ReasonPhrase _ " -->")
-			
+				
 			}
-		
+			
 		} else {
 		
 			; Current scraping:
-			set stream = scraper.scraping	
+			set:($isobject(scraper)) stream = scraper.scraping	
 		
 		}
 		
 		; Unescape the HTML:	
-		set return = ##class(%CSP.Page).UnescapeHTML(stream.Read())
+		set:(stream.SizeGet()) return = ##class(%CSP.Page).UnescapeHTML(stream.Read())
 		
 	}
 	
