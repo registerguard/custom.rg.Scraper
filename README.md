@@ -1,16 +1,20 @@
+# `custom.rg.Scraper`
+
 ## About:
 
 "Scraper" class for [Digital Technology International](http://dtint.com/)'s [ContentPublisher](http://dtint.com/Solutions/ContentPublisher) CMS which is built on Intersystems Caché, the world's fastest high performance object database.
 
-If you imporve upon this code and/or have feedback, __please__ contact me:
+If you improve upon this code and/or have feedback, __please__ contact me:
 
-micky (.) hulse [at] registerguard (.) com.
+micky [at] registerguard (.) com.
+
+... or [use this repo's issue tracker](https://github.com/registerguard/custom.rg.Scraper/issues).
 
 ## Basic usage:
 
     #(##class(custom.rg.Scraper).scrape("baz", "www.foo.com", "cms/some/path/foo.php", 10))#
 
-See scraper.csp for more examples.
+See [scraper.csp](https://github.com/registerguard/custom.rg.Scraper/blob/master/scraper/scraper.csp) for more examples.
 
 ## custom_rg_Scraper properties:
 
@@ -34,7 +38,7 @@ See scraper.csp for more examples.
 
 * __"name"__ _(Required)_ Scraping fragment identifier.
 * __"server"__ _(Required)_ The IP address or machine name of the web server that you wish to connect to.
-* __"location"__ Name of item to retrieve from the web server.
+* __"location"__ The location is the url to request, e.g. '/test.html'. This can contain parameters which are assumed to be already URL escaped.
 * __"interval"__ Time, in minutes, of scraping interval. __Default:__ 60 minutes.
 * __"force"__ Force scraping fragment update? __Default:__ False (0).
 * __"userAgent"__ The User-Agent request-header field contains information about the user agent originating the request.
@@ -47,10 +51,26 @@ See scraper.csp for more examples.
 * __"port"__ The TCP/IP port number to connect to. __Default:__ 80.
 * __"pragma"__ The Pragma general-header field is used to include implementation- specific directives that may apply to any recipient along the request/response chain.
 
------
+## TODO(?):
+
+* ClassMethod "scrape": Validate "server" parmeter? Would probably need to account for IP addys.* Use TRY/CATCH? Not sure of best way to handle this.* What's faster/easier than [`$SYSTEM.SQL.DATEDIFF`](http://docs.intersystems.com/cache20091/csp/docbook/DocBook.UI.Page.cls?KEY=RSQL_datediff)?
+
 
 ## Changelog:
 
+* v2.0.0: __2013/05/30__
+	* **MAJOR FIX:** [Squashed truncation bug](https://github.com/registerguard/custom.rg.Scraper/issues/1)!
+		* Removed `##class(%CSP.Page).EscapeHTML()` and `##class(%CSP.Page).UnescapeHTML()`.
+	* **MAJOR FIX:** Stopped using `http.Location = location` in place of `http.Get(location)`.
+		* The former would _not allow query strings_, whereas the latter does.
+	* Added `while( ' http.HttpResponse.Data.AtEnd) { ... }` to make sure the response finalizes before writing it to the database.
+	* Changed `stream.Read()` to `stream.Read($$$MaxLocalLength)`.
+		* Using `$$$MaxLocalLength` macro to make that I can safely read all of the stream content that can fit into a string without getting a `<MAXSTRING>` error.
+	* Changed `stream.SizeGet()` to `stream.Size`.
+		* The former is a getter method for the `Size` property and is implicitly invoked when you access said property.
+	* Updated/added repo boilerplate files.
+	* Moved code to `scraper` sub-folder (keeps the primary separate from the boilerplate cruft).
+	* Bumped version number.
 * v1.0.2: __2011/04/05__
 	* Modified URI formatting for storage in table.
 		* Needed to account for slash between server and location variables.
@@ -72,3 +92,15 @@ See scraper.csp for more examples.
 		* Initialized vars at top of ClassMethod (I like to see what I am working with).
 * v1.0.0: __2011/03/10__
 	* Initial public release: Uploaded to GitHub.
+
+---
+
+#### LEGAL
+
+Copyright &copy; 2013 [Micky Hulse](http://hulse.me)/[The Register-Guard](http://registerguard.com)
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this work except in compliance with the License. You may obtain a copy of the License in the LICENSE file, or at:
+
+[http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0)
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.

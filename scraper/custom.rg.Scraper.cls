@@ -1,17 +1,12 @@
 Include dtCommon
 
-/// <p>v1.0.2</p>
+/// <p>v2.0.0</p>
 /// <p><b>Scrapes given URI and stores scraping fragment in database.</b></p>
 /// <p><b>Dependacies:</b> DTI's common (dtCommon.inc) macros.</p>
 /// <p>Developed by Micky Hulse for <a href="http://www.registerguard.com">The Register-Guard</a>.</p>
 /// <p>Please visit <a href="https://github.com/mhulse/custom.rg.Scraper">GitHub</a> for more information and/or to get the latest version of this code.</p>
 /// <p>Big ups to DTI's Eric Gauthier! Thanks for the <a href="https://groups.google.com/d/topic/dti-lightning/hagUO0vUq0c/discussion">pro help</a> Eric!</p>
-/// <p>TODO:</p>
-/// <ol>
-/// <li>ClassMethod "scrape": Validate "server" parmeter? Would probably need to account for IP addys.</li>
-/// <li>Use TRY/CATCH? Not sure of best way to handle this.</li>
-/// <li>What's faster/easier than $SYSTEM.SQL.DATEDIFF?</li>
-/// </ol>
+/// <p>Additional kudos go out to Joy Peterson! Thanks for the awesome <a href="https://groups.google.com/d/msg/dti-lightning/O6VSixtFeO4/8KI3g4zP3AwJ">optimization tips and other help</a> Joy!</p>
 Class custom.rg.Scraper Extends %Persistent
 {
 
@@ -43,7 +38,7 @@ Index IDKEY On name [ IdKey ];
 /// <ul>
 /// <li><b>name:</b> <i>(Required)</i> Scraping fragment identifier.</li>
 /// <li><b>server:</b> <i>(Required)</i> The IP address or machine name of the web server that you wish to connect to.<b>*</b></li>
-/// <li><b>location:</b> Name of item to retrieve from the web server.<b>*</b></li>
+/// <li><b>location:</b> The location is the url to request, e.g. '/test.html'. This can contain parameters which are assumed to be already URL escaped.<b>*</b></li>
 /// <li><b>interval:</b> Time, in minutes, of scraping interval. <b>Default:</b> 60 minutes.</li>
 /// <li><b>force:</b> Force scraping fragment update? <b>Default:</b> False (0).</li>
 /// <li><b>userAgent:</b> The User-Agent request-header field contains information about the user agent originating the request.<b>*</b></li>
@@ -88,8 +83,8 @@ ClassMethod scrape(
 	if ($length(name) && $length(server) && (interval > 0)) {
 		
 		; Initialize global character stream object:
-		//set stream = ##class(%Stream.GlobalCharacter).%New()
-		set stream = ##class(dt.common.streams.GlobalCharacterStream).%New() // https://groups.google.com/d/topic/dti-lightning/hagUO0vUq0c/discussion
+		set stream = ##class(%Stream.GlobalCharacter).%New()
+		//set stream = ##class(dt.common.streams.GlobalCharacterStream).%New() // https://groups.google.com/d/topic/dti-lightning/hagUO0vUq0c/discussion
 		
 		; Open the Scraper object:
 		set scraper = ..%OpenId(name,, .sc)
@@ -103,7 +98,7 @@ ClassMethod scrape(
 			; %Net.HttpRequest stuff:
 			set http = ##class(%Net.HttpRequest).%New()
 			set http.Server = server
-			set:($length(location)) http.Location = location // Note the location does not contain a leading '/' character as this is implicit.
+			//set:($length(location)) http.Location = location // Note the location does not contain a leading '/' character as this is implicit.
 			set:($length(userAgent)) http.UserAgent = userAgent
 			//set:($length(params)) http.Params = params // Appears to be useless: http://tinyurl.com/4gpyvx7
 			set:(followRedirect) http.FollowRedirect = followRedirect
@@ -117,13 +112,21 @@ ClassMethod scrape(
 			//set http.XXXX = xxxxxxx
 			
 			; Get the request:
-			set sc = http.Get()
+			set sc = http.Get(location)
 			
 			; Was the request "fulfilled"?
 			if ($$$ISOK(sc) && (http.HttpResponse.StatusCode = 200)) {
 				
-				; Populate character stream:
-				do stream.Write(##class(%CSP.Page).EscapeHTML(http.HttpResponse.Data.Read()))
+				; Fully retrieve stream:
+				while( ' http.HttpResponse.Data.AtEnd) {
+					
+					; Populate character stream:
+					do stream.Write(http.HttpResponse.Data.Read())
+					
+				}
+				
+				; Rewind the stream before reading it:
+				do stream.Rewind() // Probably overkill, but it can't hurt.
 				
 				; Build request URI:
 				set uri = $case(http.Https, 1:"https", :"http") _ "://" _ http.Server _ $case(http.Port, 80:"", :":" _ http.Port) _ "/" _ $zstrip(location, "<", "/") // Should I EscapeURL too?
@@ -174,14 +177,14 @@ ClassMethod scrape(
 			}
 			
 		} else {
-		
+			
 			; Current scraping:
 			set:($isobject(scraper)) stream = scraper.scraping	
-		
+			
 		}
 		
-		; Unescape the HTML:	
-		set:(stream.SizeGet()) return = ##class(%CSP.Page).UnescapeHTML(stream.Read())
+		; Unescape the HTML:
+		set:(stream.Size) return = stream.Read($$$MaxLocalLength)
 		
 	}
 	
