@@ -4,19 +4,26 @@
 
 "Scraper" class for [Digital Technology International](http://dtint.com/)'s [ContentPublisher](http://dtint.com/Solutions/ContentPublisher) CMS which is built on Intersystems Caché, the world's fastest high performance object database.
 
+## Feedback:
+
 If you improve upon this code and/or have feedback, __please__ contact me:
 
 micky [at] registerguard (.) com.
 
 ... or [use this repo's issue tracker](https://github.com/registerguard/custom.rg.Scraper/issues).
 
+## Thank-you's:
+**Big ups** go out to [DTI](http://www.dtint.com/)'s Eric Gauthier and Joy Peterson! Thanks for the <a href="https://groups.google.com/d/topic/dti-lightning/hagUO0vUq0c/discussion">pro help</a> and <a href="https://groups.google.com/d/msg/dti-lightning/O6VSixtFeO4/8KI3g4zP3AwJ">optimization tips</a> guys!
+
 ## Basic usage:
 
-    #(##class(custom.rg.Scraper).scrape("baz", "www.foo.com", "cms/some/path/foo.php", 10))#
+```
+#(##class(custom.rg.Scraper).scrape("baz", "www.foo.com", "cms/some/path/foo.php", 10))#
+```
 
 See [scraper.csp](https://github.com/registerguard/custom.rg.Scraper/blob/master/scraper/scraper.csp) for more examples.
 
-## custom_rg_Scraper properties:
+## `custom_rg_Scraper` properties:
 
 * __"name"__ _Name_ of scraping "fragment".
 * __"interval"__ _Interval_ of scraping in minutes.
@@ -26,7 +33,7 @@ See [scraper.csp](https://github.com/registerguard/custom.rg.Scraper/blob/master
 * __"scraping"__ _Contents_ of scraping.
 * __"uri"__ _URI_ of scraping.
 
-## custom_rg_Scraper methods:
+## `custom_rg_Scraper` methods:
 
 * __"expired"__ Checks if scraping has _expired_.
 * __"diff"__ _Time difference_ since last scraping to now in minutes.
@@ -34,7 +41,7 @@ See [scraper.csp](https://github.com/registerguard/custom.rg.Scraper/blob/master
 * __"next"__ Time until _next_ scraping in minutes.
 * __"elapsed"__ _Elapsed_ time, in minutes, since last update.
 
-## custom_rg_Scraper.scrape() parameters:
+## `custom_rg_Scraper.scrape()` parameters:
 
 * __"name"__ _(Required)_ Scraping fragment identifier.
 * __"server"__ _(Required)_ The IP address or machine name of the web server that you wish to connect to.
@@ -51,7 +58,7 @@ See [scraper.csp](https://github.com/registerguard/custom.rg.Scraper/blob/master
 * __"port"__ The TCP/IP port number to connect to. __Default:__ 80.
 * __"pragma"__ The Pragma general-header field is used to include implementation- specific directives that may apply to any recipient along the request/response chain.
 
-## TODO(?):
+## To-do list:
 
 * ClassMethod "scrape": Validate "server" parmeter? Would probably need to account for IP addys.* Use TRY/CATCH? Not sure of best way to handle this.* What's faster/easier than [`$SYSTEM.SQL.DATEDIFF`](http://docs.intersystems.com/cache20091/csp/docbook/DocBook.UI.Page.cls?KEY=RSQL_datediff)?
 

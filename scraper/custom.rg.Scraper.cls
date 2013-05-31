@@ -1,12 +1,10 @@
 Include dtCommon
 
 /// <p>v2.0.0</p>
-/// <p><b>Scrapes given URI and stores scraping fragment in database.</b></p>
+/// <p><b>Scrapes a given URI and stores scraping fragment in database.</b></p>
 /// <p><b>Dependacies:</b> DTI's common (dtCommon.inc) macros.</p>
 /// <p>Developed by Micky Hulse for <a href="http://www.registerguard.com">The Register-Guard</a>.</p>
-/// <p>Please visit <a href="https://github.com/mhulse/custom.rg.Scraper">GitHub</a> for more information and/or to get the latest version of this code.</p>
-/// <p>Big ups to DTI's Eric Gauthier! Thanks for the <a href="https://groups.google.com/d/topic/dti-lightning/hagUO0vUq0c/discussion">pro help</a> Eric!</p>
-/// <p>Additional kudos go out to Joy Peterson! Thanks for the awesome <a href="https://groups.google.com/d/msg/dti-lightning/O6VSixtFeO4/8KI3g4zP3AwJ">optimization tips and other help</a> Joy!</p>
+/// <p>Please visit <a href="https://github.com/registerguard/custom.rg.Scraper">GitHub</a> for more information and/or to get the latest version of this code.</p>
 Class custom.rg.Scraper Extends %Persistent
 {
 
@@ -83,8 +81,8 @@ ClassMethod scrape(
 	if ($length(name) && $length(server) && (interval > 0)) {
 		
 		; Initialize global character stream object:
-		set stream = ##class(%Stream.GlobalCharacter).%New()
-		//set stream = ##class(dt.common.streams.GlobalCharacterStream).%New() // https://groups.google.com/d/topic/dti-lightning/hagUO0vUq0c/discussion
+		//set stream = ##class(%Stream.GlobalCharacter).%New()
+		set stream = ##class(dt.common.streams.GlobalCharacterStream).%New() // https://groups.google.com/d/topic/dti-lightning/hagUO0vUq0c/discussion
 		
 		; Open the Scraper object:
 		set scraper = ..%OpenId(name,, .sc)
